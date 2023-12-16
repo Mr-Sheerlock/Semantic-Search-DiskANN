@@ -1,12 +1,10 @@
 import random
 import Graph as G
 import numpy as np
-DBGraph=None
-R=5
+
 # Get vertices from DB and insert them into the graph
-def Initialize_Random_Graph():
+def Initialize_Random_Graph(DBPath='DB1K.csv',R=5):
     DBGraph=G.Graph()
-    DBPath='DB1K.csv'
     with open(DBPath, 'r') as f:
         DB = f.readlines()
         DB = [x.strip() for x in DB]
@@ -25,11 +23,14 @@ def Initialize_Random_Graph():
                 while(neighbor==vertex):
                     neighbor= DBGraph.get_vertex(int(random.random()*size))
                 DBGraph.add_edge((vertex.key,vertex.value),(neighbor.key,neighbor.value),0)
-                DBGraph.add_edge((neighbor.key,neighbor.value),(vertex.key,vertex.value),0)
-        return DBGraph
+    return DBGraph
+
+#gets euclidean distance between 2 vectors
 def get_distance(v1,v2):
     return  np.linalg.norm(v1-v2)
-def get_medoid():
+
+#gets medoid of a graph
+def get_medoid(DBGraph):
     min_distance=10000000000000000000
     medoid=None
     for vertex in DBGraph:
@@ -46,10 +47,35 @@ def get_medoid():
     return medoid,min_distance
 
 
-DBGraph=Initialize_Random_Graph()
-for i,vertex in enumerate(DBGraph):
-            print(vertex)
-            if(i==3):
-                break
 
-print(get_medoid())
+
+#gets min distance from any vertex in Anyset to Query
+def get_min_dist (Anyset,Query):
+    min_dist=10000000000000000000
+    min_vertex=None
+    for vertex in Anyset:
+        dist=get_distance(vertex.value,Query)
+        if(dist<min_dist):
+            min_dist=dist
+            min_vertex=vertex
+    return min_vertex,min_dist
+
+#initially, start is the medoid
+# s is a vertex, Query is a vector
+# k is a number, L is a number
+def Greedy_Search(start,Query,k,L):
+    search_List={start}
+    Visited={}
+    possible_frontier=search_List.difference(Visited)
+    while possible_frontier != {}:
+        p_star,_= get_distance(possible_frontier,Query)
+        search_List.add(p_star.neighbors)
+        Visited.add(p_star)
+        if(len(search_List)>L):
+            #update search list to retain closes L points to x_q
+            search_List.sort(key=lambda x: get_distance(x.value,Query))
+            search_List=search_List[:L]
+        possible_frontier=search_List.difference(Visited)
+    search_List.sort(key=lambda x: get_distance(x.value,Query))
+    search_List=search_List[:k]
+    return search_List,Visited
