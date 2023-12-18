@@ -68,7 +68,7 @@ def Greedy_Search(start,Query,k,L):
     Visited={}
     possible_frontier=search_List.difference(Visited)
     while possible_frontier != {}:
-        p_star,_= get_distance(possible_frontier,Query)
+        p_star,_= get_min_dist(possible_frontier,Query)
         search_List.add(p_star.neighbors)
         Visited.add(p_star)
         if(len(search_List)>L):
