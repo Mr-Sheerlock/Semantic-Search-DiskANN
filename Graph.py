@@ -54,7 +54,7 @@ class Graph(object):
             self.add_vertex(Vertex(v1_key,v1_value))
         if v2_key not in self.verticies:
             self.add_vertex(Vertex(v2_key,v2_value))
-        self.verticies[v1_key].add_neighbor(self.verticies[v2_key])
+        self.verticies[v1_key].add_neighbor(v2_key)
 
     def get_vertices(self):
         return self.verticies.keys()
