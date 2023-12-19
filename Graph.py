@@ -1,8 +1,8 @@
 class Vertex(object):
     def __init__(self, key):
-        self.key = key
-        self.neighbors = set()
-        self.value=[None]
+        self.key = key # 4 bytes 
+        self.neighbors = set() 
+        self.value=[None]  
 
     def __init__(self, key,value):
         self.key = key
