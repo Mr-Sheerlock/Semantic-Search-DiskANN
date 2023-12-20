@@ -20,5 +20,3 @@ with open(DB_Path+'DB10K.csv', 'w', newline='') as csvfile:
     for row in arr_with_indices:
         formatted_row = ['{:.8f}'.format(value) for value in row]
         csv_writer.writerow(formatted_row)
-
-
