@@ -53,13 +53,15 @@ class Graph(object):
         return self.verticies.keys()
     
     # calculates medoid of graph
-    def get_Medoid(self):
+    def get_Medoid(self,offset):
         if self.medoid is None:
             vX = list(self.get_vertices())
             Embeddings = [self.verticies[i].value for i in vX]
             vMean = np.mean(Embeddings, axis=0)                               # compute centroid
-            minIndex = self.get_vertex(np.argmin([sum((x - vMean)**2) for x in Embeddings]))
-            self.medoid=minIndex
+            minIndex=np.argmin([sum((x - vMean)**2) for x in Embeddings])
+            print(minIndex)
+            medoid = self.get_vertex(minIndex+offset)
+            self.medoid=medoid
         return self.medoid
     
     
