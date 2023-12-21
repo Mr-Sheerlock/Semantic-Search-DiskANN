@@ -18,7 +18,7 @@ class VecDB():
     
     
     # file path of binary file 
-    def __init__(self, file_path='DBIndex/', new_db=True):
+    def __init__(self, file_path='DBIndexmoot/', new_db=True):
         # R= 17, L= 15, alpha = 2, K= 5,
         self.RecordsPerCluster=10**4
         if (new_db):
@@ -116,9 +116,10 @@ class VecDB():
             dist = self.get_distance(vertex.value, query)
             return dist
     
-    def retrieve(self,query,k):
+    def retrive(self,query,k):
         query /= np.linalg.norm(query)
-
+        if(query.shape[0]==1):
+            query=query[0]
         # top k from all clusters
         ClustersResults = []
         for idx, filename in enumerate(os.listdir(self.IndexPath)):
