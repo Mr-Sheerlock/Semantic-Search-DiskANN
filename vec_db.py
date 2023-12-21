@@ -95,16 +95,14 @@ class VecDB():
         if(size==0 or size==1):
             return
         # first element in records
-        # self.offset=DBdata[0]["id"]
+        self.offset=DBdata[0]["id"]
         #Building Edges
         for vertex in DBGraph:
             # we want R neighbors
             for i in range(self.R):
-                # neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
-                neighbor= DBGraph.get_vertex(int(random.random()*size))
+                neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
                 while(neighbor==vertex):
-                    # neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
-                    neighbor= DBGraph.get_vertex(int(random.random()*size))
+                    neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
                 DBGraph.add_edge((vertex.key,vertex.value),(neighbor.key,neighbor.value))
         # get medoid of graph ie. calculate it if it's not calculated
         DBGraph.get_Medoid()
