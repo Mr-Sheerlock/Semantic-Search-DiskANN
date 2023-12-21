@@ -1,8 +1,9 @@
+import numpy as np
 class Vertex(object):
     def __init__(self, key):
-        self.key = key # 4 bytes 
-        self.neighbors = set() 
-        self.value=[None]  
+        self.key = key # 4 bytes
+        self.neighbors = set()
+        self.value=[None]
 
     def __init__(self, key,value):
         self.key = key
@@ -10,31 +11,23 @@ class Vertex(object):
         self.value=value
 
     def add_neighbor(self, neighbor):
-        # print("self.neighbors", self.neighbors)
-        # print("neighbor", neighbor)
         self.neighbors.add(neighbor)
 
     def __str__(self):
         return '{} neighbors: {} \n values: {}'.format(
             self.key,
-            [x.key for x in self.neighbors]
+            [x for x in self.neighbors]
             ,self.value[:3]
         )
-
-    # def get_connections(self):
-    #     return self.neighbors
-
-    # def get_weight(self, neighbor):
-    #     return self.neighbors[neighbor]
-    
     # get neighbor vertices
     def get_neighbors(self):
         return self.neighbors
-    
+
 class Graph(object):
     def __init__(self):
         self.verticies = {}
-
+        self.medoid=None
+    
     def add_vertex(self, vertex):
         self.verticies[vertex.key] = vertex
 
@@ -58,9 +51,22 @@ class Graph(object):
 
     def get_vertices(self):
         return self.verticies.keys()
+    
+    # calculates medoid of graph
+    def get_Medoid(self):
+        if self.medoid is None:
+            vX = list(self.get_vertices())
+            Embeddings = [self.verticies[i].value for i in vX]
+            vMean = np.mean(Embeddings, axis=0)                               # compute centroid
+            minIndex = self.get_vertex(np.argmin([sum((x - vMean)**2) for x in Embeddings]))
+            self.medoid=minIndex
+        return self.medoid
+    
+    
+    
 
     def __iter__(self):
         return iter(self.verticies.values())
-    
+
     def __str__(self):
         return 'Graph({})'.format(dict(self.verticies))
