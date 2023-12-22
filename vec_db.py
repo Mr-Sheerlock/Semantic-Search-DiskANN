@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
+import sys
 
 class VecDB():
     #TODO: 
@@ -13,6 +14,8 @@ class VecDB():
         # where file path is the path to the binary file having the index
         # retrieve(query, top_k)
     # L R 
+    # R > log n
+    fiveKparams=(14,15)
     tenKparams=(15,17)
     hundredKparams=(20,20)
     
@@ -21,6 +24,7 @@ class VecDB():
     def __init__(self, file_path='DBIndexmoot/', new_db=True):
         # R= 17, L= 15, alpha = 2, K= 5,
         self.RecordsPerCluster=10**4
+        # self.RecordsPerCluster=5*10**3
         if (new_db):
             #TODO: Check the records per cluster here or at insert records
             self.L,self.R = VecDB.tenKparams
@@ -31,10 +35,12 @@ class VecDB():
         self.IndexPath = file_path
         self.DBGraph=None
         self.currentfile=0
-        if(not new_db):
-            # load graph from binary file
-            #TODO: remove hard coded value
-            self.DBGraph= pickle.load(open(file_path+"0.bin", "rb"))
+        if os.path.exists(self.IndexPath):
+            print("Found existing files and their count is",len(os.listdir(self.IndexPath)))
+        # if(not new_db):
+        #     # load graph from binary file
+        #     #TODO: remove hard coded value
+        #     self.DBGraph= pickle.load(open(file_path+"0.bin", "rb"))
     
     
     
@@ -53,7 +59,9 @@ class VecDB():
             return
         
         self.DBGraph = self.Initialize_Random_Graph(records)
+        # print("Random graph Size",sys.getsizeof(self.DBGraph))
         self.Build_Index()
+        # print("Index graph Size",sys.getsizeof(self.DBGraph))
         
         # handle directory doesn't exist
         if not os.path.exists(self.IndexPath):
@@ -95,7 +103,7 @@ class VecDB():
         if(size==0 or size==1):
             return
         # first element in records
-        self.offset=DBdata[0]["id"]
+        self.offset=DBdata[0][0]
         #Building Edges
         for vertex in DBGraph:
             # we want R neighbors
@@ -105,7 +113,7 @@ class VecDB():
                     neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
                 DBGraph.add_edge((vertex.key,vertex.value),(neighbor.key,neighbor.value))
         # get medoid of graph ie. calculate it if it's not calculated
-        DBGraph.get_Medoid()
+        DBGraph.get_Medoid(self.offset)
 
         return DBGraph
 
@@ -120,25 +128,23 @@ class VecDB():
             query=query[0]
         # top k from all clusters
         ClustersResults = []
-        for idx, filename in enumerate(os.listdir(self.IndexPath)):
+        for filename in os.listdir(self.IndexPath):
+            if ( filename[-3:] !="bin"):
+                continue
             filepath = os.path.join(self.IndexPath, filename)
             
             self.DBGraph = pickle.load(open(filepath,"rb"))
+            # print("size of DbGraph is ", sys.getsizeof(self.DBGraph))
 
-            TopK,_= self.Greedy_Search(self.DBGraph.medoid,query, k)
-            # distance,index=((self.index_to_distance(k, query), k+(idx* self.offset)) for k in TopK)
-            # ListToAdd=
-            # add top k from this cluster to the list
-            # print(ListToAdd)
+            TopK= self.Greedy_Search_Online(self.DBGraph.medoid,query, k)
             ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
             self.offset+=len(self.DBGraph.verticies)
-            del self.DBGraph
+            # del self.DBGraph
 
         # print(ClustersResults)
         # sorts on first element of the tuple (which are the distances)
+        # print("size of Full Results is ", sys.getsizeof(ClustersResults))
         ClustersResults.sort()
-        # print(ClustersResults)
-        # only get ids
         ClustersResults = [element[1] for element in ClustersResults[:k]]
         return ClustersResults
     
@@ -176,11 +182,46 @@ class VecDB():
                 min_vertex=vertex.key
         return min_vertex,min_dist
 
+    def Greedy_Search_Online(self,start,Query, k):
+        search_List={start.key}
+        Visited=set()
+        #TODO: make the visited and the possible frontier set of indices instead of vertices to save ram.
+        possible_frontier=search_List
+        Query /= np.linalg.norm(Query)
+        while possible_frontier != set():
+            # print('possible_frontier',possible_frontier)
+            p_star,_= self.get_min_dist_Key(possible_frontier,Query)
+
+            # print('pstar',p_star)
+            # if p_star==None:
+            #     # break
+            #     print('frontier: ')
+            #     for v in possible_frontier:
+            #         print(v)
+            #     print(possible_frontier==set())
+            search_List=search_List.union(self.DBGraph.get_vertex(p_star).neighbors)
+            Visited.add(p_star)
+            if(len(search_List)>self.L):
+                #update search list to retain closes L points to x_q
+                search_ListL_L=list(search_List)
+                search_ListL_L.sort(key=lambda x: self.get_distance(self.DBGraph.get_vertex(x).value,Query))
+                # only maintain L closest points
+                search_ListL_L=search_ListL_L[:self.L]
+                search_List=set(search_ListL_L)
+
+            possible_frontier=search_List.difference(Visited)
+
+        search_ListL_L=list(search_List)
+        search_ListL_L.sort(key=lambda x: self.get_distance(self.DBGraph.get_vertex(x).value,Query))
+        # only maintain k closest points
+        search_ListL_L=search_ListL_L[:k]
+        search_List=set(search_ListL_L)
+        # both are vectors of integers
+        return search_List
 
     #initially, start is the medoid
     # s is a vertex, Query is a vector
     # k is a number, L is a number
-    # TODO: change them to be indices instead of vertices to save ram
     def Greedy_Search(self,start,Query, k):
         search_List={start.key}
         Visited=set()

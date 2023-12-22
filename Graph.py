@@ -59,7 +59,6 @@ class Graph(object):
             Embeddings = [self.verticies[i].value for i in vX]
             vMean = np.mean(Embeddings, axis=0)                               # compute centroid
             minIndex=np.argmin([sum((x - vMean)**2) for x in Embeddings])
-            print(minIndex)
             medoid = self.get_vertex(minIndex+offset)
             self.medoid=medoid
         return self.medoid
