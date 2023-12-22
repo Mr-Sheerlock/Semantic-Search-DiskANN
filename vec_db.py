@@ -21,7 +21,7 @@ class VecDB():
     
     
     # file path of binary file 
-    def __init__(self, file_path='DBIndexmoot/', new_db=True):
+    def __init__(self, file_path='DBIndex10K/', new_db=True):
         # R= 17, L= 15, alpha = 2, K= 5,
         self.RecordsPerCluster=10**4
         # self.RecordsPerCluster=5*10**3
@@ -144,6 +144,7 @@ class VecDB():
         # print(ClustersResults)
         # sorts on first element of the tuple (which are the distances)
         # print("size of Full Results is ", sys.getsizeof(ClustersResults))
+        del self.DBGraph
         ClustersResults.sort()
         ClustersResults = [element[1] for element in ClustersResults[:k]]
         return ClustersResults
