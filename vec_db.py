@@ -5,6 +5,7 @@ import pandas as pd
 import pickle
 import os
 import sys
+from sklearn.cluster import DBSCAN, KMeans
 
 class VecDB():
     #TODO: 
@@ -28,15 +29,20 @@ class VecDB():
         if (new_db):
             #TODO: Check the records per cluster here or at insert records
             self.L,self.R = VecDB.tenKparams
+            self.n_clusters=10
+            if os.path.exists(self.IndexPath):
+                print("Found existing files and their count is",len(os.listdir(self.IndexPath)))
         else: 
             self.L,self.R = VecDB.hundredKparams  
+            self.n_clusters=10
         self.alpha = 2
         self.offset = 0
         self.IndexPath = file_path
         self.DBGraph=None
         self.currentfile=0
-        if os.path.exists(self.IndexPath):
-            print("Found existing files and their count is",len(os.listdir(self.IndexPath)))
+        # medoids of all the clusters that we will get
+        self.medoids=[]
+        
         # if(not new_db):
         #     # load graph from binary file
         #     #TODO: remove hard coded value
@@ -48,16 +54,26 @@ class VecDB():
     #TODO: CHECK after klam el mo3eed: might need to handle enk t4oof el directory 
     # records are list of dictionaries containing id and embeddings
     def insert_records(self, records):
-        # might wanna change records per cluster if records are more than 100k
-        for i in range(0, len(records), self.RecordsPerCluster):
-            #segment
-            if(i+self.RecordsPerCluster>len(records)):
-                temp = records[i:]
-            else:
-                temp = records[i:(i + self.RecordsPerCluster)]
-            #TODO: check this line
-            # self.insert_records(temp)
-            self.DBGraph = self.Initialize_Random_Graph(temp)
+        
+        # begin by clustering
+        # records = np.array([[x["id"]] + x["embed"] for x in records])
+        ids=np.array([x["id"] for x in records])
+        # records=[x["embed"] for x in records]
+        records=np.array([x["embed"] for x in records])
+        #normalize records
+        records /= np.linalg.norm(records, axis=1)[:, np.newaxis]
+
+        clustered_DB=KMeans(n_clusters=self.n_clusters).fit(records)
+        #divide clustered_DB accoding to which label it was classsified
+        for label in np.unique(clustered_DB.labels_):
+            indices = np.where(clustered_DB.labels_ == label)
+            tempIds= ids[indices]
+            tempRecs =records[indices]
+            self.DBGraph = self.Initialize_Random_Graph(tempIds,tempRecs)
+            #hardcoded zero
+            medoid=self.DBGraph.get_Medoid(0)
+            self.medoids.append(medoid)
+            self.DBGraph.medoid=medoid
             self.Build_Index()
     
             # handle directory doesn't exist
@@ -68,28 +84,10 @@ class VecDB():
             with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
                 pickle.dump(self.DBGraph, f)
             self.currentfile=len(os.listdir(self.IndexPath))
-        # if(len(records)>self.RecordsPerCluster):
-        #     # split into clusters of 10k
-        #     for i in range(0, len(records), self.RecordsPerCluster):
-        #         temp = records[i:(i + self.RecordsPerCluster)]
-        #         #TODO: check this line
-        #         self.insert_records(temp)
-        #         self.currentfile+=1
-        #     return
         
-        # self.DBGraph = self.Initialize_Random_Graph(records)
-        # # print("Random graph Size",sys.getsizeof(self.DBGraph))
-        # self.Build_Index()
-        # # print("Index graph Size",sys.getsizeof(self.DBGraph))
-        
-        # # handle directory doesn't exist
-        # if not os.path.exists(self.IndexPath):
-        #     os.makedirs(self.IndexPath)
-        # # set current file to len of current files in director
-        # self.currentfile+=len(os.listdir(self.IndexPath))
-        # with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
-        #     pickle.dump(self.DBGraph, f)
-    #TODO:  CHECK return to this later
+        # print("Done inserting, now Writing medoids ")
+        with open (self.IndexPath+"medoids.bin", 'wb') as f:
+            pickle.dump(self.medoids, f)
     
     def load_binary_data(self, binary_file_path):
     # Load the data from the binary file
@@ -103,37 +101,23 @@ class VecDB():
     # Initialize a Graph connected randomly from the given records
     # records is a list of dictionaries containing id and embeddings
     # the function also calls the graph to calculate its medoid
-    def Initialize_Random_Graph(self, records):
+    def Initialize_Random_Graph(self,ids,records):
         DBGraph=Graph()
-        DBdata = [[x["id"]] + x["embed"] for x in records]
-        # print(len(DBdata))
-        for row in DBdata:
-            dataKey = int(row[0])
-            dataValue= np.array(row[1:],dtype=float)
-            # normalize 1 time initially
-            dataValue /= np.linalg.norm(dataValue)
-            DBGraph.add_vertex(Vertex(dataKey, dataValue))
+        for i in range(len(ids)) :
+            DBGraph.add_vertex(Vertex(ids[i], records[i]))
 
         size= len(DBGraph.verticies)
-        # for vertex in DBGraph:
-        #     print(vertex)
-        # print(size)
-        # add to offset for when writing the next cluster of vertices
         if(size==0 or size==1):
             return
-        # first element in records
-        self.offset=DBdata[0][0]
+        self.offset=ids[0]
         #Building Edges
         for vertex in DBGraph:
             # we want R neighbors
             for i in range(self.R):
-                neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
+                neighbor= DBGraph.get_vertex(np.random.choice(ids))
                 while(neighbor==vertex):
-                    neighbor= DBGraph.get_vertex(int(random.random()*size) + self.offset)
+                    neighbor= DBGraph.get_vertex(np.random.choice(ids))
                 DBGraph.add_edge((vertex.key,vertex.value),(neighbor.key,neighbor.value))
-        # get medoid of graph ie. calculate it if it's not calculated
-        DBGraph.get_Medoid(self.offset)
-
         return DBGraph
 
     def index_to_distance(self,id, query):
@@ -146,19 +130,23 @@ class VecDB():
         if(query.shape[0]==1):
             query=query[0]
         # top k from all clusters
+        if (len(self.medoids)==0):
+            self.medoids=pickle.load(open(self.IndexPath+"medoids.bin","rb"))
+        # get k medoids who are closes to query
+        distances=np.array([self.get_distance(medoid.value,query) for medoid in self.medoids])
+        sortedindices=np.argsort(distances)
+        files = [self.IndexPath+str(i)+".bin" for i in sortedindices[:k]]
         ClustersResults = []
-        for filename in os.listdir(self.IndexPath):
-            if ( filename[-3:] !="bin"):
-                continue
-            filepath = os.path.join(self.IndexPath, filename)
+        for filename in files:
+            # if ( filename[-3:] !="bin"):
+            #     continue
+            # filepath = os.path.join(self.IndexPath, filename)
             
-            self.DBGraph = pickle.load(open(filepath,"rb"))
-            # print("size of DbGraph is ", sys.getsizeof(self.DBGraph))
+            self.DBGraph = pickle.load(open(filename,"rb"))
 
             TopK= self.Greedy_Search_Online(self.DBGraph.medoid,query, k)
             ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
             self.offset+=len(self.DBGraph.verticies)
-            # del self.DBGraph
 
         # print(ClustersResults)
         # sorts on first element of the tuple (which are the distances)
@@ -177,16 +165,6 @@ class VecDB():
 
 
     def get_min_dist_Key (self,AnyKeysSet,Query):
-        # arrKey = list(AnyKeysSet)
-        # arrEmb = np.array([self.DBGraph.get_vertex(i).value for i in arrKey])
-
-        # a_norm = np.linalg.norm(arrEmb, axis=1)
-        # b_norm = np.linalg.norm(Query)
-        # dist = (arrEmb @ Query) / (a_norm * b_norm)
-
-        # # minDist = np.linalg.norm(arrEmb, axis=1)
-        # minIndex = np.argmin(dist)
-        # return arrKey[minIndex], -1
 
         # put to 50 because the max distance is 2 anyway 
         min_dist=50
@@ -212,13 +190,6 @@ class VecDB():
             # print('possible_frontier',possible_frontier)
             p_star,_= self.get_min_dist_Key(possible_frontier,Query)
 
-            # print('pstar',p_star)
-            # if p_star==None:
-            #     # break
-            #     print('frontier: ')
-            #     for v in possible_frontier:
-            #         print(v)
-            #     print(possible_frontier==set())
             search_List=search_List.union(self.DBGraph.get_vertex(p_star).neighbors)
             Visited.add(p_star)
             if(len(search_List)>self.L):
@@ -251,14 +222,6 @@ class VecDB():
         while possible_frontier != set():
             # print('possible_frontier',possible_frontier)
             p_star,_= self.get_min_dist_Key(possible_frontier,Query)
-
-            # print('pstar',p_star)
-            # if p_star==None:
-            #     # break
-            #     print('frontier: ')
-            #     for v in possible_frontier:
-            #         print(v)
-            #     print(possible_frontier==set())
             search_List=search_List.union(self.DBGraph.get_vertex(p_star).neighbors)
             Visited.add(p_star)
             if(len(search_List)>self.L):
@@ -287,8 +250,7 @@ class VecDB():
         # candidate_set.difference({point.key}) # changed
         candidate_set=candidate_set.difference({point.key}) # changed
         point.neighbors=set()
-        # print("candidate_set", candidate_set)
-        # while candidate_set not empty
+
         while candidate_set:
             p_star,_= self.get_min_dist_Key(candidate_set,point.value)
             point.neighbors.add(p_star)
@@ -297,11 +259,7 @@ class VecDB():
             DummySet=candidate_set.copy()
             for candidatePointKey in candidate_set:
                 candidatePoint=self.DBGraph.get_vertex(candidatePointKey)
-                # print(alpha * self.get_distance(self.DBGraph.get_vertex(p_star).value,candidatePoint.value), " <= ", self.get_distance(candidatePoint.value,point.value))
-                # print(alpha)
-                # ">=" condition is reversed as we use cosine similarity (paper uses L2), so higher value means it is closer
                 if(alpha * self.get_distance(self.DBGraph.get_vertex(p_star).value,candidatePoint.value) <= self.get_distance(candidatePoint.value,point.value)):
-                    # print("HEEEEEEEEEEEEEEEEELPPPPPPPPPPP !!!!!!!!!!!!!!!!!!!!!!")
                     DummySet.remove(candidatePoint.key)
             candidate_set=DummySet
 
