@@ -134,6 +134,12 @@ class VecDB():
             self.medoids=pickle.load(open(self.IndexPath+"medoids.bin","rb"))
         
         noOfGraphs= 10
+        if(len(self.medoids)==100):
+            noOfGraphs= 15
+        elif(len(self.medoids)<=1000):
+            noOfGraphs= 20
+        elif(len(self.medoids)==2000):
+            noOfGraphs= 25
         # if k is larger than the number of files
         if (noOfGraphs>=len(self.medoids)):
             files = [self.IndexPath+str(i)+".bin" for i in range(len(self.medoids))]
