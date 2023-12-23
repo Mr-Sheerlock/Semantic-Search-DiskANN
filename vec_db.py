@@ -132,13 +132,15 @@ class VecDB():
         # top k from all clusters
         if (len(self.medoids)==0):
             self.medoids=pickle.load(open(self.IndexPath+"medoids.bin","rb"))
+        
+        noOfGraphs= 10
         # if k is larger than the number of files
-        if (k>=len(self.medoids)):
+        if (noOfGraphs>=len(self.medoids)):
             files = [self.IndexPath+str(i)+".bin" for i in range(len(self.medoids))]
         else:
             distances=np.array([self.get_distance(medoid.value,query) for medoid in self.medoids])
             sortedindices=np.argsort(distances)
-            files = [self.IndexPath+str(i)+".bin" for i in sortedindices[:k]]
+            files = [self.IndexPath+str(i)+".bin" for i in sortedindices[:noOfGraphs]]
         # print(files)
 
         ClustersResults = []
