@@ -49,27 +49,46 @@ class VecDB():
     # records are list of dictionaries containing id and embeddings
     def insert_records(self, records):
         # might wanna change records per cluster if records are more than 100k
-        if(len(records)>self.RecordsPerCluster):
-            # split into clusters of 10k
-            for i in range(0, len(records), self.RecordsPerCluster):
+        for i in range(0, len(records), self.RecordsPerCluster):
+            #segment
+            if(i+self.RecordsPerCluster>len(records)):
+                temp = records[i:]
+            else:
                 temp = records[i:(i + self.RecordsPerCluster)]
-                #TODO: check this line
-                self.insert_records(temp)
-                self.currentfile+=1
-            return
+            #TODO: check this line
+            # self.insert_records(temp)
+            self.DBGraph = self.Initialize_Random_Graph(temp)
+            self.Build_Index()
+    
+            # handle directory doesn't exist
+            if not os.path.exists(self.IndexPath):
+                os.makedirs(self.IndexPath)
+            # set current file to len of current files in director
+            print("writing to ",self.IndexPath+str(self.currentfile)+".bin")
+            with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
+                pickle.dump(self.DBGraph, f)
+            self.currentfile=len(os.listdir(self.IndexPath))
+        # if(len(records)>self.RecordsPerCluster):
+        #     # split into clusters of 10k
+        #     for i in range(0, len(records), self.RecordsPerCluster):
+        #         temp = records[i:(i + self.RecordsPerCluster)]
+        #         #TODO: check this line
+        #         self.insert_records(temp)
+        #         self.currentfile+=1
+        #     return
         
-        self.DBGraph = self.Initialize_Random_Graph(records)
-        # print("Random graph Size",sys.getsizeof(self.DBGraph))
-        self.Build_Index()
-        # print("Index graph Size",sys.getsizeof(self.DBGraph))
+        # self.DBGraph = self.Initialize_Random_Graph(records)
+        # # print("Random graph Size",sys.getsizeof(self.DBGraph))
+        # self.Build_Index()
+        # # print("Index graph Size",sys.getsizeof(self.DBGraph))
         
-        # handle directory doesn't exist
-        if not os.path.exists(self.IndexPath):
-            os.makedirs(self.IndexPath)
-        # set current file to len of current files in director
-        self.currentfile+=len(os.listdir(self.IndexPath))
-        with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
-            pickle.dump(self.DBGraph, f)
+        # # handle directory doesn't exist
+        # if not os.path.exists(self.IndexPath):
+        #     os.makedirs(self.IndexPath)
+        # # set current file to len of current files in director
+        # self.currentfile+=len(os.listdir(self.IndexPath))
+        # with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
+        #     pickle.dump(self.DBGraph, f)
     #TODO:  CHECK return to this later
     
     def load_binary_data(self, binary_file_path):
