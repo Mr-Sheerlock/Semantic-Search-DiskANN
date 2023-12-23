@@ -26,6 +26,7 @@ class VecDB():
         # R= 17, L= 15, alpha = 2, K= 5,
         self.RecordsPerCluster=10**4
         # self.RecordsPerCluster=5*10**3
+        self.IndexPath = file_path
         if (new_db):
             #TODO: Check the records per cluster here or at insert records
             self.L,self.R = VecDB.tenKparams
@@ -37,7 +38,6 @@ class VecDB():
             self.n_clusters=10
         self.alpha = 2
         self.offset = 0
-        self.IndexPath = file_path
         self.DBGraph=None
         self.currentfile=0
         # medoids of all the clusters that we will get
