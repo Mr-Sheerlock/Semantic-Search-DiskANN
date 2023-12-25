@@ -6,6 +6,7 @@ import pickle
 import os
 import sys
 from multiprocessing import Process
+import multiprocessing
 
 class VecDB():
     #TODO: 
@@ -69,11 +70,11 @@ class VecDB():
     
     def insert_records(self, records):
         # might wanna change records per cluster if records are more than 100k
-        
-        recordPerProc = len(records)//4
+        cores = multiprocessing.cpu_count()
+        recordPerProc = len(records)//cores
         procs = []
         strItr = 0
-        for i in range(4):
+        for i in range(cores):
             endItr = strItr + recordPerProc
             proc = Process(target = self.ParrallelInsert, args = (records[strItr:endItr], strItr))
             procs.append(proc)
