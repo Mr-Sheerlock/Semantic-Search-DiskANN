@@ -5,6 +5,7 @@ import pandas as pd
 import pickle
 import os
 import sys
+from multiprocessing import Process
 
 class VecDB():
     #TODO: 
@@ -43,12 +44,8 @@ class VecDB():
         #     self.DBGraph= pickle.load(open(file_path+"0.bin", "rb"))
     
     
-    
-    
-    #TODO: CHECK after klam el mo3eed: might need to handle enk t4oof el directory 
-    # records are list of dictionaries containing id and embeddings
-    def insert_records(self, records):
-        # might wanna change records per cluster if records are more than 100k
+    def ParrallelInsert(self, records, strtFileIdx):
+        
         for i in range(0, len(records), self.RecordsPerCluster):
             #segment
             if(i+self.RecordsPerCluster>len(records)):
@@ -64,10 +61,51 @@ class VecDB():
             if not os.path.exists(self.IndexPath):
                 os.makedirs(self.IndexPath)
             # set current file to len of current files in director
-            print("writing to ",self.IndexPath+str(self.currentfile)+".bin")
-            with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
+            print("writing to ",self.IndexPath+str(strtFileIdx)+".bin")
+            with open (self.IndexPath+str(strtFileIdx)+"_2.bin", 'wb') as f:
                 pickle.dump(self.DBGraph, f)
-            self.currentfile=len(os.listdir(self.IndexPath))
+            # self.currentfile=len(os.listdir(self.IndexPath))
+            strtFileIdx+=1
+    
+    def insert_records(self, records):
+        # might wanna change records per cluster if records are more than 100k
+        
+        recordPerProc = len(records)//4
+        procs = []
+        strItr = 0
+        for i in range(4):
+            endItr = strItr + recordPerProc
+            proc = Process(target = self.ParrallelInsert, args = (records[strItr:endItr], strItr))
+            procs.append(proc)
+            proc.start()
+            strItr += recordPerProc
+            
+        for proc in procs:
+            proc.join()   
+    
+    # #TODO: CHECK after klam el mo3eed: might need to handle enk t4oof el directory 
+    # # records are list of dictionaries containing id and embeddings
+    # def insert_records(self, records):
+    #     # might wanna change records per cluster if records are more than 100k
+    #     for i in range(0, len(records), self.RecordsPerCluster):
+    #         #segment
+    #         if(i+self.RecordsPerCluster>len(records)):
+    #             temp = records[i:]
+    #         else:
+    #             temp = records[i:(i + self.RecordsPerCluster)]
+    #         #TODO: check this line
+    #         # self.insert_records(temp)
+    #         self.DBGraph = self.Initialize_Random_Graph(temp)
+    #         self.Build_Index()
+    
+    #         # handle directory doesn't exist
+    #         if not os.path.exists(self.IndexPath):
+    #             os.makedirs(self.IndexPath)
+    #         # set current file to len of current files in director
+    #         print("writing to ",self.IndexPath+str(self.currentfile)+".bin")
+    #         with open (self.IndexPath+str(self.currentfile)+".bin", 'wb') as f:
+    #             pickle.dump(self.DBGraph, f)
+    #         self.currentfile=len(os.listdir(self.IndexPath))
         # if(len(records)>self.RecordsPerCluster):
         #     # split into clusters of 10k
         #     for i in range(0, len(records), self.RecordsPerCluster):
@@ -340,3 +378,56 @@ class VecDB():
                     self.Robust_Prune(inb, U, alpha)
                 else:
                     inb.add_neighbor(node.key)
+                    
+                    
+                    
+                    #PARRALLEL CODE
+    
+    # def Parrallel_itr(self, randIndex, alpha):       
+    #     for n in randIndex:
+    #         node = self.DBGraph.get_vertex(n)
+    #         # print(n)
+
+    #         (_,V) = self.Greedy_Search(self.DBGraph.medoid, node.value, 1) #K=1
+            
+    #         self.Robust_Prune(node, V, alpha)
+            
+    #         neighbors = node.get_neighbors()
+
+    #         for inbKey in neighbors:
+
+    #             # CHECK : The backward edge is always added
+    #             # check here in case we shouldn't add it in all cases ? Might be incorrect?
+    #             inb=self.DBGraph.get_vertex(inbKey)
+    #             if len(inb.get_neighbors()) > self.R:
+    #                 # print("inb.get_neighbors()", inb.get_neighbors())
+    #                 U = inb.get_neighbors().union({node.key})
+    #                 # inb.add_neighbor(node.key)
+    #                 self.Robust_Prune(inb, U, alpha)
+    #             else:
+    #                 inb.add_neighbor(node.key)
+                        
+    # def test(self,randIndex, alpha, strItr,endItr):
+    #     print("Start at: ",strItr)
+    #     print("End at: ",endItr)
+    #     print("proc no.", randIndex[0])
+    #     print(alpha)
+
+    # def iterationOverGraph(self,alpha):
+        
+    #     randIndex = list(self.DBGraph.get_vertices())
+    #     random.shuffle(randIndex)
+    #     # print(randIndex)
+    #     procs = []
+    #     strItr = 0
+        
+    #     #loop over the randIndex and Divide
+    #     for i in range(4):
+    #         endItr = strItr + (len(randIndex)//4)
+    #         proc = Process(target = self.Parrallel_itr, args = (randIndex[int(strItr):int(endItr)-1], alpha))
+    #         procs.append(proc)
+    #         proc.start()
+    #         strItr += len(randIndex)//4
+            
+    #     for proc in procs:
+    #         proc.join()
