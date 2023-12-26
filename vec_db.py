@@ -49,7 +49,7 @@ class VecDB():
         #     self.DBGraph= pickle.load(open(file_path+"0.bin", "rb"))
     
     
-    
+   
     
     #TODO: CHECK after klam el mo3eed: might need to handle enk t4oof el directory 
     # records are list of dictionaries containing id and embeddings
@@ -125,6 +125,21 @@ class VecDB():
             dist = self.get_distance(vertex.value, query)
             return dist
     
+
+    def Parallel_Files(self,files,query,k):
+        for filename in files:
+            # if ( filename[-3:] !="bin"):
+            #     continue
+            # filepath = os.path.join(self.IndexPath, filename)
+            
+            DBGraph = pickle.load(open(filename,"rb"))
+
+            TopK= self.Greedy_Search_Online(DBGraph.medoid,query, k)
+            # ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
+            ClustersResults=[(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK]
+            return ClustersResults,filename #assume filename is correctly labled
+            # self.offset+=len(self.DBGraph.verticies)
+
     def retrive(self,query,k):
         query /= np.linalg.norm(query)
         if(query.shape[0]==1):
@@ -134,18 +149,22 @@ class VecDB():
             self.medoids=pickle.load(open(self.IndexPath+"medoids.bin","rb"))
         
         noOfGraphs= 10
-        if(len(self.medoids)==100):
-            noOfGraphs= 15
-        elif(len(self.medoids)<=1000):
+        if(len(self.medoids)==100): # 1 million 
             noOfGraphs= 20
-        elif(len(self.medoids)==2000):
+        elif(len(self.medoids)<=1000): # 10 million
             noOfGraphs= 25
+        elif(len(self.medoids)<=1500): # 10 million
+            noOfGraphs= 27
+        elif(len(self.medoids)==2000): # 20 million
+            noOfGraphs= 30
         # if k is larger than the number of files
         if (noOfGraphs>=len(self.medoids)):
             files = [self.IndexPath+str(i)+".bin" for i in range(len(self.medoids))]
         else:
             distances=np.array([self.get_distance(medoid.value,query) for medoid in self.medoids])
+            #sort indices according to distances
             sortedindices=np.argsort(distances)
+
             files = [self.IndexPath+str(i)+".bin" for i in sortedindices[:noOfGraphs]]
         # print(files)
 
@@ -159,7 +178,7 @@ class VecDB():
 
             TopK= self.Greedy_Search_Online(self.DBGraph.medoid,query, k)
             ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
-            self.offset+=len(self.DBGraph.verticies)
+            # self.offset+=len(self.DBGraph.verticies)
 
         # print(ClustersResults)
         # sorts on first element of the tuple (which are the distances)
