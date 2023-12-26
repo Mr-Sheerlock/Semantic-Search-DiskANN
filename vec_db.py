@@ -6,6 +6,8 @@ import pickle
 import os
 import sys
 from sklearn.cluster import DBSCAN, KMeans
+from multiprocessing import Process,Queue,cpu_count, Pool
+
 
 class VecDB():
     #TODO: 
@@ -126,21 +128,25 @@ class VecDB():
             return dist
     
 
-    def Parallel_Files(self,files,query,k):
-        for filename in files:
-            # if ( filename[-3:] !="bin"):
-            #     continue
-            # filepath = os.path.join(self.IndexPath, filename)
-            
-            DBGraph = pickle.load(open(filename,"rb"))
+    # def Parallel_Files(self,file,query,k):
+    def Parallel_Files(self,temp):
+        # if ( filename[-3:] !="bin"):
+        #     continue
+        # filepath = os.path.join(self.IndexPath, filename)
+        file,query,k=temp
+        DBGraph = pickle.load(open(file,"rb"))
+        V=VecDB()
+        V.DBGraph=DBGraph
 
-            TopK= self.Greedy_Search_Online(DBGraph.medoid,query, k)
-            # ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
-            ClustersResults=[(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK]
-            return ClustersResults,filename #assume filename is correctly labled
-            # self.offset+=len(self.DBGraph.verticies)
+        TopK= V.Greedy_Search_Online(DBGraph.medoid,query, k)
+        # ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
+        ClustersResults=[(V.index_to_distance(VertexId, query), VertexId) for VertexId in TopK]
+        return ClustersResults #assume filename is correctly labled
+        # self.offset+=len(self.DBGraph.verticies)
 
     def retrive(self,query,k):
+        threads=cpu_count()
+        # print("Number of cpus : ", threads)
         query /= np.linalg.norm(query)
         if(query.shape[0]==1):
             query=query[0]
@@ -168,25 +174,19 @@ class VecDB():
             files = [self.IndexPath+str(i)+".bin" for i in sortedindices[:noOfGraphs]]
         # print(files)
 
-        ClustersResults = []
-        for filename in files:
-            # if ( filename[-3:] !="bin"):
-            #     continue
-            # filepath = os.path.join(self.IndexPath, filename)
-            
-            self.DBGraph = pickle.load(open(filename,"rb"))
+        # for filename in files:
+        #     self.DBGraph = pickle.load(open(filename,"rb"))
 
-            TopK= self.Greedy_Search_Online(self.DBGraph.medoid,query, k)
-            ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
+        #     TopK= self.Greedy_Search_Online(self.DBGraph.medoid,query, k)
+        #     ClustersResults.extend([(self.index_to_distance(VertexId, query), VertexId) for VertexId in TopK])
             # self.offset+=len(self.DBGraph.verticies)
-
-        # print(ClustersResults)
-        # sorts on first element of the tuple (which are the distances)
-        # print("size of Full Results is ", sys.getsizeof(ClustersResults))
-        del self.DBGraph
-        ClustersResults.sort()
-        ClustersResults = [element[1] for element in ClustersResults[:k]]
-        return ClustersResults
+        pool = Pool() 
+        results = pool.map(self.Parallel_Files, [(i,query,k) for i in files])
+        results=[item for sublist in results for item in sublist]
+        FinalResults=results
+        FinalResults.sort()
+        FinalResults=  [element[1] for element in FinalResults[:k]]
+        return FinalResults
     
     # gets euclidean distance between 2 vectors
     def get_distance(self,v1,v2):
@@ -242,6 +242,37 @@ class VecDB():
         # both are vectors of integers
         return search_List
 
+
+
+    # def Greedy_Search_Online(self,start,Query, k):
+        # search_List={start.key}
+        # Visited=set()
+        # #TODO: make the visited and the possible frontier set of indices instead of vertices to save ram.
+        # possible_frontier=search_List
+        # Query /= np.linalg.norm(Query)
+        # while possible_frontier != set():
+        #     # print('possible_frontier',possible_frontier)
+        #     p_star,_= self.get_min_dist_Key(possible_frontier,Query)
+
+        #     search_List=search_List.union(self.DBGraph.get_vertex(p_star).neighbors)
+        #     Visited.add(p_star)
+        #     if(len(search_List)>self.L):
+        #         #update search list to retain closes L points to x_q
+        #         search_ListL_L=list(search_List)
+        #         search_ListL_L.sort(key=lambda x: self.get_distance(self.DBGraph.get_vertex(x).value,Query))
+        #         # only maintain L closest points
+        #         search_ListL_L=search_ListL_L[:self.L]
+        #         search_List=set(search_ListL_L)
+
+        #     possible_frontier=search_List.difference(Visited)
+
+        # search_ListL_L=list(search_List)
+        # search_ListL_L.sort(key=lambda x: self.get_distance(self.DBGraph.get_vertex(x).value,Query))
+        # # only maintain k closest points
+        # search_ListL_L=search_ListL_L[:k]
+        # search_List=set(search_ListL_L)
+        # # both are vectors of integers
+        # return search_List
     #initially, start is the medoid
     # s is a vertex, Query is a vector
     # k is a number, L is a number
